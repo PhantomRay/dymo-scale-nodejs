@@ -4,22 +4,31 @@
       HID = require('node-hid'),
       usb = require('usb'),
       log4js = require('log4js'),
-      util = require('util');
+      util = require('util'),
+      server = require('./server').start();
 
   log4js.configure(config.log);
   var logger = log4js.getLogger();
 
-  logger.info('Started in ' + process.env.NODE_ENV);
+  logger.info('started in ' + process.env.NODE_ENV + ' mode');
 
   var reading = false,
-      interval, vid = 0x922,
-      pid = 0x8003;
+      interval,
+      vid = 0x922,
+      pid = 0x8003,
+      msg = '';
 
   startReading();
 
   usb.on('attach', function (device) {
       if (device.deviceDescriptor.idVendor === vid && device.deviceDescriptor.idProduct === pid) {
-          logger.info('Dymo M10 attached');
+          msg = 'Dymo M10 attached';
+          logger.info(msg);
+
+          server.subscriber.emit('message', {
+              type: 'info',
+              message: msg
+          });
 
           interval = setInterval(startReading, 1000);
       }
@@ -27,7 +36,14 @@
 
   usb.on('detach', function (device) {
       if (device.deviceDescriptor.idVendor === vid && device.deviceDescriptor.idProduct === pid) {
-          logger.warn('Dymo M10 detached');
+          msg = 'Dymo M10 detached';
+          logger.warn(msg);
+
+          server.subscriber.emit('message', {
+              type: 'warn',
+              message: msg
+          });
+
           reading = false;
           clearInterval(interval);
       }
@@ -37,7 +53,6 @@
       if (reading) return;
       try {
           var d = new HID.HID(vid, pid);
-
           reading = true;
 
           d.on('data', function (data) {
@@ -46,25 +61,55 @@
 
               var grams = buf[4] + (256 * buf[5]);
               if (buf[1] === 5) {
-                  logger.warn('TARE IS ON');
+                  msg = 'TARE IS ON';
+                  logger.warn(msg);
+                  server.subscriber.emit('message', {
+                      type: 'error',
+                      message: msg
+                  });
               } else if (grams > 0 && buf[3] === 255) {
+                  msg = 'Please switch to gram';
                   // in ounce
-                  logger.warn('Please switch to gram');
-              } else
+                  logger.warn(msg);
+                  server.subscriber.emit('message', {
+                      type: 'error',
+                      message: msg
+                  });
+              } else {
                   logger.debug(grams + ' grams');
+                  server.subscriber.emit('message', {
+                      type: 'weight',
+                      message: grams
+                  });
+              }
           });
 
           d.on('error', function (err) {
-              if (!/could not read from HID device/.test(err.message))
+              if (!/could not read from HID device/.test(err.message)) {
                   logger.error(err);
+                  server.subscriber.emit('message', {
+                      type: 'error',
+                      message: err.message
+                  });
+              }
 
               reading = false;
               d.close();
           });
       } catch (err) {
           if (/cannot open device/.test(err.message)) {
-              logger.warn('Dymo M10 cannot be found');
-          } else
+              msg = 'Dymo M10 cannot be found';
+              server.subscriber.emit('message', {
+                  type: 'error',
+                  message: msg
+              });
+              logger.warn(msg);
+          } else {
               logger.error(err);
+              server.subscriber.emit('message', {
+                  type: 'error',
+                  message: err.message
+              });
+          }
       }
   }
