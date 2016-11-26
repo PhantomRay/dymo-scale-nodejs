@@ -26,8 +26,9 @@
           logger.info(msg);
 
           server.subscriber.emit('message', {
-              type: 'info',
-              message: msg
+              type: 'status',
+              code: 'connected',
+              content: msg
           });
 
           interval = setInterval(startReading, 1000);
@@ -40,8 +41,9 @@
           logger.warn(msg);
 
           server.subscriber.emit('message', {
-              type: 'warn',
-              message: msg
+              type: 'status',
+              code: 'disconnected',
+              content: msg
           });
 
           reading = false;
@@ -64,22 +66,23 @@
                   msg = 'TARE IS ON';
                   logger.warn(msg);
                   server.subscriber.emit('message', {
-                      type: 'error',
-                      message: msg
+                      type: 'status',
+                      code: 'tare',
+                      content: msg
                   });
-              } else if (grams > 0 && buf[3] === 255) {
+              } else if (grams > 0 && buf[3] === 255) { // in ounce
                   msg = 'Please switch to gram';
-                  // in ounce
                   logger.warn(msg);
                   server.subscriber.emit('message', {
-                      type: 'error',
-                      message: msg
+                      type: 'status',
+                      code: 'ounce',
+                      content: msg
                   });
               } else {
                   logger.debug(grams + ' grams');
                   server.subscriber.emit('message', {
                       type: 'weight',
-                      message: grams
+                      content: grams
                   });
               }
           });
@@ -88,8 +91,9 @@
               if (!/could not read from HID device/.test(err.message)) {
                   logger.error(err);
                   server.subscriber.emit('message', {
-                      type: 'error',
-                      message: err.message
+                      type: 'status',
+                      code: 'disconnected',
+                      content: err.message
                   });
               }
 
@@ -100,14 +104,16 @@
           if (/cannot open device/.test(err.message)) {
               msg = 'Dymo M10 cannot be found';
               server.subscriber.emit('message', {
-                  type: 'error',
-                  message: msg
+                  type: 'status',
+                  code: 'disconnected',
+                  content: msg
               });
               logger.warn(msg);
           } else {
               logger.error(err);
               server.subscriber.emit('message', {
-                  type: 'error',
+                  type: 'status',
+                  code: 'unknown',
                   message: err.message
               });
           }

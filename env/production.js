@@ -8,7 +8,7 @@ module.exports = {
             level: 'INFO',
             appender: {
                 type: 'dateFile',
-                filename: '',
+                filename: 'log',
                 pattern: 'yyyyMMdd.log',
                 alwaysIncludePattern: true
             }

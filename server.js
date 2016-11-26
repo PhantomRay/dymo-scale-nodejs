@@ -11,11 +11,13 @@ log4js.configure(config.log);
 var log = log4js.getLogger();
 
 exports.start = function (port) {
+    port = port || 8081;
     var wss = new WebSocketServer({
-        port: port || 8081
+        port: port
     });
 
     wss.on('connection', function (ws) {
+        console.log('new connection');
         ws.on('message', function (message) {
             console.log('received: %s', message);
         });
@@ -37,60 +39,3 @@ exports.start = function (port) {
     wss.subscriber = subscriber;
     return wss;
 };
-
-
-
-function sendMessage(ws, msg, type, replyTo) {
-    type = type || '';
-    replyTo = replyTo || null;
-
-    if (ws.readyState === ws.OPEN) {
-        var data = {
-            messageId: uuid.v4(),
-            replyTo: replyTo,
-            body: typeof (msg) === 'object' ? JSON.stringify(msg) : msg,
-            type: type,
-            timestamp: new Date().toISOString()
-        };
-
-        ws.send(JSON.stringify(data));
-        log.v('data sent to client:');
-        log.v(data);
-    }
-}
-
-function processMessage(msg) {
-    try {
-        msg = JSON.parse(msg);
-    } catch (err) {
-
-    }
-    log.trace('message received from rmm server:');
-    log.trace(JSON.stringify(msg));
-    try {
-        if (typeof (msg) === 'object') {
-            msg.type = msg.type || '';
-
-            if (msg.type.toLowerCase() === 'error') {
-                log.error(msg.content);
-            } else {
-                log.error(msg.type);
-                switch (msg.type.toLowerCase()) {
-                case 'ping':
-                    break;
-                case 'message':
-                    sendMessage(msg.content, 'message', msg.messageId);
-                    break;
-                default:
-                    break;
-                }
-            }
-        } else {
-            log.w('unidentified message');
-            log.w(msg);
-        }
-    } catch (err) {
-        log.error(err);
-        sendMessage(err, 'error', msg.MessageId);
-    }
-}
